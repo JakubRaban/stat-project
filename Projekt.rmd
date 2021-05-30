@@ -1,7 +1,7 @@
 ---
 title: "Projekt"
 author: "Emilia Majerz, Jakub Raban"
-date: "30 05 2021"
+date: "30.05.2021"
 output: html_document
 ---
 
@@ -9,11 +9,19 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 # Projekt zaliczeniowy - analiza zbioru danych sprzedaży mieszkań w Korei
-Pobrany przez nas zbiór danych zawiera 5891 obserwacji na temat mieszkań sprzedanych w jednej z koreańskich prowincji. Zbiór danych zawiera
+Pobrany przez nas zbiór danych zawiera 5891 obserwacji na temat mieszkań sprzedanych w koreańskiej prowincji Daegu. Zbiór danych zawiera
 30 kolumn, w tym cenę sprzedaży mieszkania.
 
 ```{r}
 file <- read.csv("dane.csv")
 df <- data.frame(file)
-nrow(df[df$Floor > 10, ])
+head(df)
 ```
+
+## Regresja po cenie sprzedaży
+
+
+
+## Klasyfikacja po piętrze
+
+
