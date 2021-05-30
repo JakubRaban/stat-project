@@ -9,18 +9,81 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 # Projekt zaliczeniowy - analiza zbioru danych sprzedaży mieszkań w Korei
-Pobrany przez nas zbiór danych zawiera 5891 obserwacji na temat mieszkań sprzedanych w koreańskiej prowincji Daegu. Zbiór danych zawiera
-30 kolumn, w tym cenę sprzedaży mieszkania.
+Pobrany przez nas zbiór danych zawiera 5891 obserwacji na temat mieszkań sprzedanych w koreańskiej prowincji Daegu w latach 2007-17. 
+Zbiór danych zawiera 30 kolumn, w tym cenę sprzedaży mieszkania.
 
 ```{r}
-file <- read.csv("dane.csv")
+file <- read.csv("dane.csv", stringsAsFactors = T)
 df <- data.frame(file)
+# Usunięcie kolumn zależnych od pozostałych
+df <- df[, !(names(df) %in% c("N_FacilitiesNearBy.Total.", "N_SchoolNearBy.Total."))]
+
+cat(nrow(df), "x", length(df))
 head(df)
 ```
 
 ## Regresja po cenie sprzedaży
+Chcemy wyuczyć model przewidujący cenę sprzedaży mieszkania na podstawie pozostałych jego parametrów znajdujących się w zbiorze danych (takich jak powierzchnia, piętro itp.)
 
+### Regresja liniowa
 
+Najpierw należy podzielić zbiór danych na zbiór treningowy i testowy
+```{r}
+sample.size <- floor(0.8 * nrow(df))
+set.seed(123)
+train.ind <- sample(seq_len(nrow(df)), size = sample.size)
+train <- df[train.ind, ]
+test <- df[-train.ind, ]
+```
+
+Następnie przeprowadzamy trening regresji liniowej na zbiorze treningowym. Odrzucamy przy tym dwie zmienne które są zależne od pozostałych zmiennych w zbiorze. Przy użyciu funkcji `summary` wyświetlamy model:
+```{r}
+dir_linear <- list()
+dir_linear$fit <- lm(SalePrice ~ ., data = train)
+summary(dir_linear$fit)
+```
+
+Widzimy że model ma R^2 równy 0.8844, co jest wynikiem niezłym. \ 
+p-wartości dla większości zmiennych są bardzo małe, co dobrze świadczy o użyteczności tych zmiennych w treningu modelu. Najmniejszą użyteczność w  modelu wykazują chociażby zmienne mówiące o ilości szpitali w pobliżu czy też o rodzaju zarządzania mieszkaniem. \ 
+Charakter predyktora (dodatni/ujemny) jest widoczny w pierwszej kolumnie. Najsilniejszy wpływ (ujemny) ma zmienna mówiąca o najbliższym przystanku autobusowym gdy nie ma żadnego w pobliżu. \ 
+Następnie możemy przejść do dopasowania modelu do danych testowych.
+
+```{r}
+rmse = function (actual, predicted) {
+  sqrt(mean((actual - predicted) ^ 2))
+}
+```
+
+Predykcja i błąd RMSE:
+```{r}
+dir_linear$predicted <- predict(dir_linear$fit, test)
+rmse(test$SalePrice, dir_linear$predicted)
+```
+
+Niektóre spośród dopasowań:
+```{r}
+predicted.df <- data.frame(test$SalePrice, dir_linear$predicted)
+predicted.df.sample <- sample(seq_len(nrow(predicted.df)), size = 10)
+predicted.df[predicted.df.sample, ]
+```
+
+### Regresja przy użyciu funkcji sklejanych
+
+Postaramy się poprawić dokładność modelu używając funkcji sklejanych do dopasowania metrażu mieszkania
+```{r}
+hist(df$Size.sqf.)
+```
+
+```{r}
+library(splines)
+dir_spline <- list()
+spline_knots <- c(600, 700, 800, 900, 1000)
+dir_spline$fit <- lm(SalePrice ~ . - Size.sqf. + bs(Size.sqf., knots = spline_knots), data = train)
+summary(dir_spline$fit)
+
+dir_spline$predicted <- predict(dir_spline$fit, test)
+rmse(test$SalePrice, dir_spline$predicted)
+```
 
 ## Klasyfikacja po piętrze
 
