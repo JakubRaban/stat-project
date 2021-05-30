@@ -24,32 +24,48 @@ Chcemy wyuczyć model przewidujący cenę sprzedaży mieszkania na podstawie poz
 
 ### Regresja liniowa
 
+Najpierw należy podzielić zbiór danych na zbiór treningowy i testowy
 ```{r}
-# Podział zbioru danych na zbiór treningowy i testowy
 sample.size <- floor(0.8 * nrow(df))
 set.seed(123)
 train.ind <- sample(seq_len(nrow(df)), size = sample.size)
 train <- df[train.ind, ]
 test <- df[-train.ind, ]
+```
 
-# Trening modelu
+Następnie przeprowadzamy trening regresji liniowej na zbiorze treningowym. Odrzucamy przy tym dwie zmienne które są zależne od pozostałych zmiennych w zbiorze. Przy użyciu funkcji `summary` wyświetlamy model:
+```{r}
 dir_logistic <- list()
 dir_logistic$fit <- lm(SalePrice ~ . - N_FacilitiesNearBy.Total. - N_SchoolNearBy.Total. , data = train)
 summary(dir_logistic$fit)
+```
 
-# Predykcja na zbiorze testowym
-dir_logistic$predicted <- predict(dir_logistic$fit, test)
+Widzimy że model ma R^2 równy 0.8844, co jest wynikiem niezłym. \ 
+p-wartości dla większości zmiennych są bardzo małe, co dobrze świadczy o użyteczności tych zmiennych w treningu modelu. Najmniejszą użyteczność w  modelu wykazują chociażby zmienne mówiące o ilości szpitali w pobliżu czy też o rodzaju zarządzania mieszkaniem. \ 
+Charakter predyktora (dodatni/ujemny) jest widoczny w pierwszej kolumnie. Najsilniejszy wpływ (ujemny) ma zmienna mówiąca o najbliższym przystanku autobusowym gdy nie ma żadnego w pobliżu. \ 
+Następnie możemy przejść do dopasowania modelu do danych testowych.
 
+```{r}
 rmse = function (actual, predicted) {
   sqrt(mean((actual - predicted) ^ 2))
 }
-length(test$SalePrice)
-length(dir_logistic$predicted)
-
-rmse(test$SalePrice, dir_logistic$predicted)
-
-
 ```
+
+Predykcja i błąd RMSE:
+```{r}
+dir_logistic$predicted <- predict(dir_logistic$fit, test)
+rmse(test$SalePrice, dir_logistic$predicted)
+```
+
+Niektóre spośród dopasowań:
+```{r}
+predicted.df <- data.frame(test$SalePrice, dir_logistic$predicted)
+predicted.df.sample <- sample(seq_len(nrow(predicted.df)), size = 10)
+predicted.df[predicted.df.sample, ]
+```
+
+### Regresja inna XD
+
 
 
 ## Klasyfikacja po piętrze
