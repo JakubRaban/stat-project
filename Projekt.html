@@ -166,17 +166,19 @@ pre code {
 
 <h1 class="title toc-ignore">Projekt</h1>
 <h4 class="author">Emilia Majerz, Jakub Raban</h4>
-<h4 class="date">30 05 2021</h4>
+<h4 class="date">30.05.2021</h4>
 
 </div>
 
 
 <div id="projekt-zaliczeniowy---analiza-zbioru-danych-sprzedaży-mieszkań-w-korei" class="section level1">
 <h1>Projekt zaliczeniowy - analiza zbioru danych sprzedaży mieszkań w Korei</h1>
-<p>Pobrany przez nas zbiór danych zawiera 5891 obserwacji na temat mieszkań sprzedanych w koreańskiej prowincji Daegu. Zbiór danych zawiera 30 kolumn, w tym cenę sprzedaży mieszkania.</p>
-<pre class="r"><code>file &lt;- read.csv(&quot;dane.csv&quot;)
+<p>Pobrany przez nas zbiór danych zawiera 5891 obserwacji na temat mieszkań sprzedanych w koreańskiej prowincji Daegu w latach 2007-17. Zbiór danych zawiera 30 kolumn, w tym cenę sprzedaży mieszkania.</p>
+<pre class="r"><code>file &lt;- read.csv(&quot;dane.csv&quot;, stringsAsFactors = T)
 df &lt;- data.frame(file)
-head(df)</code></pre>
+cat(nrow(df), &quot;x&quot;, length(df))</code></pre>
+<pre><code>## 5891 x 30</code></pre>
+<pre class="r"><code>head(df)</code></pre>
 <pre><code>##   SalePrice YearBuilt YrSold MonthSold Size.sqf. Floor HallwayType
 ## 1    141592      2006   2007         8       814     3    terraced
 ## 2     51327      1985   2007         8       587     8    corridor
@@ -242,6 +244,90 @@ head(df)</code></pre>
 ## 6                    17</code></pre>
 <div id="regresja-po-cenie-sprzedaży" class="section level2">
 <h2>Regresja po cenie sprzedaży</h2>
+<p>Chcemy wyuczyć model przewidujący cenę sprzedaży mieszkania na podstawie pozostałych jego parametrów znajdujących się w zbiorze danych (takich jak powierzchnia, piętro itp.)</p>
+<div id="regresja-liniowa" class="section level3">
+<h3>Regresja liniowa</h3>
+<pre class="r"><code># Podział zbioru danych na zbiór treningowy i testowy
+sample.size &lt;- floor(0.8 * nrow(df))
+set.seed(123)
+train.ind &lt;- sample(seq_len(nrow(df)), size = sample.size)
+train &lt;- df[train.ind, ]
+test &lt;- df[-train.ind, ]
+
+# Trening modelu
+dir_logistic &lt;- list()
+dir_logistic$fit &lt;- lm(SalePrice ~ . - N_FacilitiesNearBy.Total. - N_SchoolNearBy.Total. , data = train)
+summary(dir_logistic$fit)</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = SalePrice ~ . - N_FacilitiesNearBy.Total. - N_SchoolNearBy.Total., 
+##     data = train)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -157684  -19471     496   20348  162652 
+## 
+## Coefficients: (10 not defined because of singularities)
+##                                      Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)                        -3.614e+07  1.097e+06 -32.935  &lt; 2e-16 ***
+## YearBuilt                           5.182e+03  5.230e+02   9.909  &lt; 2e-16 ***
+## YrSold                              1.274e+04  2.110e+02  60.369  &lt; 2e-16 ***
+## MonthSold                           2.022e+03  1.610e+02  12.562  &lt; 2e-16 ***
+## Size.sqf.                           1.404e+02  1.974e+00  71.144  &lt; 2e-16 ***
+## Floor                               1.167e+03  7.659e+01  15.243  &lt; 2e-16 ***
+## HallwayTypemixed                   -5.361e+05  3.624e+04 -14.794  &lt; 2e-16 ***
+## HallwayTypeterraced                 3.250e+05  1.871e+04  17.369  &lt; 2e-16 ***
+## HeatingTypeindividual_heating      -1.397e+05  4.193e+04  -3.332 0.000869 ***
+## AptManageTypeself_management        2.662e+04  1.203e+04   2.212 0.027010 *  
+## N_Parkinglot.Ground.                5.533e+02  4.665e+01  11.862  &lt; 2e-16 ***
+## N_Parkinglot.Basement.             -8.589e+02  4.245e+01 -20.235  &lt; 2e-16 ***
+## TimeToBusStop10min~15min           -1.409e+06  7.986e+04 -17.644  &lt; 2e-16 ***
+## TimeToBusStop5min~10min            -1.285e+05  9.708e+03 -13.235  &lt; 2e-16 ***
+## TimeToSubway10min~15min            -5.347e+05  3.507e+04 -15.246  &lt; 2e-16 ***
+## TimeToSubway15min~20min             2.390e+05  1.772e+04  13.487  &lt; 2e-16 ***
+## TimeToSubway5min~10min             -2.554e+05  2.270e+04 -11.248  &lt; 2e-16 ***
+## TimeToSubwayno_bus_stop_nearby     -1.139e+06  6.552e+04 -17.379  &lt; 2e-16 ***
+## N_APT                               8.334e+04  3.916e+03  21.283  &lt; 2e-16 ***
+## N_manager                           9.235e+04  4.455e+03  20.729  &lt; 2e-16 ***
+## N_elevators                        -6.699e+04  3.971e+03 -16.870  &lt; 2e-16 ***
+## SubwayStationBanwoldang            -1.123e+05  1.345e+04  -8.354  &lt; 2e-16 ***
+## SubwayStationChil-sung-market      -2.250e+02  1.321e+04  -0.017 0.986409    
+## SubwayStationDaegu                 -5.160e+04  1.578e+04  -3.269 0.001086 ** 
+## SubwayStationKyungbuk_uni_hospital  2.282e+04  5.121e+03   4.456 8.55e-06 ***
+## SubwayStationMyung-duk              1.045e+05  7.394e+03  14.129  &lt; 2e-16 ***
+## SubwayStationno_subway_nearby       1.142e+06  6.323e+04  18.054  &lt; 2e-16 ***
+## SubwayStationSin-nam                       NA         NA      NA       NA    
+## N_FacilitiesNearBy.PublicOffice.    1.027e+05  5.715e+03  17.962  &lt; 2e-16 ***
+## N_FacilitiesNearBy.Hospital.        2.800e+03  4.238e+03   0.661 0.508801    
+## N_FacilitiesNearBy.Dpartmentstore.         NA         NA      NA       NA    
+## N_FacilitiesNearBy.Mall.                   NA         NA      NA       NA    
+## N_FacilitiesNearBy.ETC.                    NA         NA      NA       NA    
+## N_FacilitiesNearBy.Park.                   NA         NA      NA       NA    
+## N_SchoolNearBy.Elementary.                 NA         NA      NA       NA    
+## N_SchoolNearBy.Middle.                     NA         NA      NA       NA    
+## N_SchoolNearBy.High.                       NA         NA      NA       NA    
+## N_SchoolNearBy.University.                 NA         NA      NA       NA    
+## N_FacilitiesInApt                          NA         NA      NA       NA    
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 35810 on 4683 degrees of freedom
+## Multiple R-squared:  0.8844, Adjusted R-squared:  0.8837 
+## F-statistic:  1279 on 28 and 4683 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre class="r"><code># Predykcja na zbiorze testowym
+dir_logistic$predicted &lt;- predict(dir_logistic$fit, test)</code></pre>
+<pre><code>## Warning in predict.lm(dir_logistic$fit, test): prediction from a rank-deficient
+## fit may be misleading</code></pre>
+<pre class="r"><code>rmse = function (actual, predicted) {
+  sqrt(mean((actual - predicted) ^ 2))
+}
+length(test$SalePrice)</code></pre>
+<pre><code>## [1] 1179</code></pre>
+<pre class="r"><code>length(dir_logistic$predicted)</code></pre>
+<pre><code>## [1] 1179</code></pre>
+<pre class="r"><code>rmse(test$SalePrice, dir_logistic$predicted)</code></pre>
+<pre><code>## [1] 37109.78</code></pre>
+</div>
 </div>
 <div id="klasyfikacja-po-piętrze" class="section level2">
 <h2>Klasyfikacja po piętrze</h2>

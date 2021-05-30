@@ -9,17 +9,47 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 # Projekt zaliczeniowy - analiza zbioru danych sprzedaży mieszkań w Korei
-Pobrany przez nas zbiór danych zawiera 5891 obserwacji na temat mieszkań sprzedanych w koreańskiej prowincji Daegu. Zbiór danych zawiera
-30 kolumn, w tym cenę sprzedaży mieszkania.
+Pobrany przez nas zbiór danych zawiera 5891 obserwacji na temat mieszkań sprzedanych w koreańskiej prowincji Daegu w latach 2007-17. 
+Zbiór danych zawiera 30 kolumn, w tym cenę sprzedaży mieszkania.
 
 ```{r}
-file <- read.csv("dane.csv")
+file <- read.csv("dane.csv", stringsAsFactors = T)
 df <- data.frame(file)
+cat(nrow(df), "x", length(df))
 head(df)
 ```
 
 ## Regresja po cenie sprzedaży
+Chcemy wyuczyć model przewidujący cenę sprzedaży mieszkania na podstawie pozostałych jego parametrów znajdujących się w zbiorze danych (takich jak powierzchnia, piętro itp.)
 
+### Regresja liniowa
+
+```{r}
+# Podział zbioru danych na zbiór treningowy i testowy
+sample.size <- floor(0.8 * nrow(df))
+set.seed(123)
+train.ind <- sample(seq_len(nrow(df)), size = sample.size)
+train <- df[train.ind, ]
+test <- df[-train.ind, ]
+
+# Trening modelu
+dir_logistic <- list()
+dir_logistic$fit <- lm(SalePrice ~ . - N_FacilitiesNearBy.Total. - N_SchoolNearBy.Total. , data = train)
+summary(dir_logistic$fit)
+
+# Predykcja na zbiorze testowym
+dir_logistic$predicted <- predict(dir_logistic$fit, test)
+
+rmse = function (actual, predicted) {
+  sqrt(mean((actual - predicted) ^ 2))
+}
+length(test$SalePrice)
+length(dir_logistic$predicted)
+
+rmse(test$SalePrice, dir_logistic$predicted)
+
+
+```
 
 
 ## Klasyfikacja po piętrze
