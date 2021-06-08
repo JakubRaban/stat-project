@@ -7,6 +7,10 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(MASS)
+library(mltools)
+library(class)
+library(rpart)
 ```
 # Projekt zaliczeniowy - analiza zbioru danych sprzedaży mieszkań w Korei
 Pobrany przez nas zbiór danych zawiera 5891 obserwacji na temat mieszkań sprzedanych w koreańskiej prowincji Daegu w latach 2007-17. 
@@ -98,6 +102,294 @@ predicted.df.sample <- sample(seq_len(nrow(predicted.df)), size = 10)
 predicted.df[predicted.df.sample, ]
 ```
 
-## Klasyfikacja po piętrze
+
+
+## Klasyfikacja po rozmiarze mieszkania - duże/małe
+```{r}
+file <- read.csv("dane.csv")
+df <- data.frame(file)
+head(df)
+```
+
+```{r}
+counts = df$Size.sqf.
+hist(counts, main="Flats distribution", xlab="Size sqf", ylab="Count", xlim=c(0,max(counts)), col="darkmagenta")
+```
+
+### Podział względem rozmiaru mieszkania: małe do 908 stóp kwadratowych, duże: powyżej
+```{r}
+sum(df$Size.sqf. <= 908)
+sum(df$Size.sqf. <= 908)/ length(df$YearBuilt)
+sum(df$Size.sqf. > 908)
+sum(df$Size.sqf. > 908) / length(df$YearBuilt)
+```
+Małe mieszkania stanowią ok. 46% zbioru danych, duże - ok. 54%.
+
+```{r}
+Big <- factor(ifelse(df$Size.sqf. <= 908, "No", "Yes"))
+dfB <- data.frame(df, Big)
+```
+```{r}
+head(dfB)
+```
+### Zmienne:
+```{r}
+names(dfB)
+```
+### Macierz korelacji zmiennych numerycznych:
+```{r}
+#nums <- unlist(lapply(dfB, is.numeric))  
+dfB2 = lapply(dfB, function(x) as.numeric(as.factor(x)))
+
+cor(data.frame(dfB2))
+```
+
+### Celem analizy jest odpowiedź na pytanie, od czego zależy rozmiar mieszkania. Do regresji logistycznej nie będą brane pod uwagę:
+* cecha na podstawie której powstała zmienna predykowana - a więc rozmiar mieszkania  
+* cechy związane ze sprzedażą mieszkania (cena, rok i miesiąc sprzedaży)  
+* cechy wynikające bezpośrednio z innych cech: łączna liczba obiektów w pobliżu mieszkania, łączna liczba szkół w pobliżu  
+* numer mieszkania
+* cechy silnie skorelowane z pozostałymi cechami: liczba uniwersytetów w pobliżu (silna korelacja z liczbą szkół średnich oraz liczbą obiektów z kategorii "urzędy publiczne" oraz "pozostałe")  
+* czas do metra (bez usunięcia tej cechy konieczne jest usunięcie liczby udogodnień w mieszkaniu, po którym wyniki są zależne wyłącznie od piętra, na którym znajduje się mieszkanie oraz minimalnie od roku budowy)  
+* stacja metra w pobliżu - cecha związana z położeniem geograficznym na mapie dzielnicy (logicznie mogąca mieć powiązanie z liczbą obiektów różnych typów w pobliżu)  
+
+### Podział na zbiór treningowy i testowy
+```{r}
+set.seed(1)
+n <- nrow(dfB)
+test <- sample(n, n / 5)
+train <- -test
+```
+
+### Regresja logistyczna dla przewidywania wartości Big w zależności od pozostałych cech:
+```{r}
+dir_logistic <- list()
+dir_logistic$fit <- glm(Big ~ . -Size.sqf. -SalePrice -MonthSold -YrSold -N_FacilitiesNearBy.Total. -N_SchoolNearBy.Total. -N_APT  -N_SchoolNearBy.University. -TimeToSubway -SubwayStation,
+                   family = binomial, data = dfB, subset=train)
+summary(dir_logistic$fit)
+```
+
+### Rozmiar mieszkania jest zależny od (w kolejności malejącej istotności predyktorów):
+* piętra, na którym znajduje się mieszkanie - im wyższe piętro, tym większe mieszkanie - może to wynikać z faktu znajdowania się apartamentów na wysokich piętrach budynków. Wpływ tego predyktora jest jednak niewielki (ok. 0.004)  
+* rodzaju korytarza - "terraced" - mieszkania z korytarzem na zewnątrz budynku są większe - duży wpływ (ok. 12)    
+* liczby osób zarządzających mieszkaniem (ochrona, osoby sprzątające itp.) - wpływ ujemny - większymi mieszkaniami zarządza mniej osób - może wynikać z mniejszej liczby mieszkań w budynku, jeśli mieszkania są duże - wpływ ok. 1.3  
+* odległości od przystanku autobusowego wynoszącej 5-10min - wpływ ujemny - duże mieszkania będą znajdować się dalej od przystanków - spory wpływ, ok. -5   
+* rodzaju korytarza - "mixed" - korytarz łączący typ na zewnątrz i wewnątrz budynku. Duży, dodatni wpływ (ok. 13)  
+* liczby szkół podstawowych w okolicy - wpływ ujemny. Może wynikać np. z nieposiadania przez rodziców małych dzieci możliwości zakupu dużych mieszkań lub z pomieszczenia mniejszej liczby osób w większych mieszkaniach -> mniejszej liczby dzieci w nich. Wpływ ok. 1.8  
+* roku budowy - niewielki wpływ ujemny (ok. -0.26). Może wynikać z możliwości budowy większych budynków gdy obszary były mniej zagospodarowane  
+* liczby szpitali w pobliżu - wpływ ujemny, ok. 2.8. 
+* liczby szkół średnich w pobliżu - wpływ dodatni, ok. 3.6. Może wynikać z występowania w okolicach szkół średnich większych mieszkań wynajmowanych uczniom  
+* liczby udogodnień w mieszkaniu - nieduży dodatni wpływ, ok. 0.6. W większych mieszkaniach liczba udogodnień będzie większa, co może wynikać zarówno z samego ich rozmiaru (zakładając w przybliżeniu podobną liczbę udogodnień/jednostkę powierzchni) jak i z poziomu luksusu w mieszkaniu, który może być większy w mieszkaniach dużych
+* rodzaju zarządzania mieszkaniem - samodzielne - duży wpływ ujemny, ok. -3.4. 
+* (wyrazu wolnego)
+* liczby parków w okolicy - duży wpływ dodatni, ok. 4.5. Może wynikać np. z występowania dużych mieszkań w luksusowych okolicach, w których zwykle znajdują się róWnież parki, bądź na obrzeżach, w których parków jest więcej.  
+
+### Ocena jakości predykcji na zbiorze treningowym:
+#### Macierz pomyłek:
+```{r}
+dir_logistic$probs <- predict(dir_logistic$fit, dfB[train,], type = "response")
+dir_logistic$predicted <- ifelse(dir_logistic$probs > 0.5, "Yes", "No")
+dir_logistic$cm <- table(dir_logistic$predicted, dfB$Big[train])
+dir_logistic$cm
+```
+#### Treningowa proporcja błędów:
+```{r}
+(dir_logistic$cm[1, 2] + dir_logistic$cm[2, 1]) / sum(dir_logistic$cm)
+```
+### Ocena jakości predykcji na zbiorze testowym:
+#### Macierz pomyłek:
+```{r}
+dir_logistic$probs <- predict(dir_logistic$fit, dfB[test,], type = "response")
+dir_logistic$predicted <- ifelse(dir_logistic$probs > 0.5, "Yes", "No")
+dir_logistic$cm <- table(dir_logistic$predicted, dfB$Big[test])
+dir_logistic$cm
+```
+#### Testowa proporcja błędów:
+```{r}
+(dir_logistic$cm[1, 2] + dir_logistic$cm[2, 1]) / sum(dir_logistic$cm)
+```
+Testowa proporcja błędów jest nieco gorsza niż treningowa (ok. 26.7% vs ok. 25.5%).  
+
+
+### Próba poprawy klasyfikatora poprzez eliminację najmniej istotnych predyktorów - wybranie predyktorów z siedmioma najlepszymi p-wartościami:
+```{r}
+dir_logistic_best <- list()
+dir_logistic_best$fit <- glm(Big ~ YearBuilt + Floor + HallwayType + TimeToBusStop + N_manager + N_SchoolNearBy.Elementary., family = binomial, data = dfB, subset=train)
+summary(dir_logistic_best$fit)
+```
+### Ocena jakości predykcji na zbiorze treningowym:
+#### Macierz pomyłek:
+```{r}
+dir_logistic_best$probs <- predict(dir_logistic_best$fit, dfB[train,], type = "response")
+dir_logistic_best$predicted <- ifelse(dir_logistic_best$probs > 0.5, "Yes", "No")
+dir_logistic_best$cm <- table(dir_logistic_best$predicted, dfB$Big[train])
+dir_logistic_best$cm
+```
+#### Treningowa proporcja błędów:
+```{r}
+(dir_logistic_best$cm[1, 2] + dir_logistic_best$cm[2, 1]) / sum(dir_logistic_best$cm)
+```
+### Ocena jakości predykcji na zbiorze testowym:
+#### Macierz pomyłek:
+```{r}
+dir_logistic_best$probs <- predict(dir_logistic_best$fit, dfB[test,], type = "response")
+dir_logistic_best$predicted <- ifelse(dir_logistic_best$probs > 0.5, "Yes", "No")
+dir_logistic_best$cm <- table(dir_logistic_best$predicted, dfB$Big[test])
+dir_logistic_best$cm
+```
+#### Testowa proporcja błędów:
+```{r}
+(dir_logistic_best$cm[1, 2] + dir_logistic_best$cm[2, 1]) / sum(dir_logistic_best$cm)
+```
+Jakość klasyfikacji spadła - na zbiorze testowym z ok. 26.7% do ok. 27.5%. Testowa proporcja błędów jest nieco gorsza niż treningowa (ok. 27.5% vs ok. 26.2%).  
+
+### Klasyfikacja z wykorzystaniem LDA (bez wyboru najlepszych cech):
+
+```{r}
+dir_lda <- list()
+dir_lda$fit <- lda(Big ~ . -Size.sqf. -SalePrice -MonthSold -YrSold -N_FacilitiesNearBy.Total. -N_SchoolNearBy.Total. -N_APT  -N_SchoolNearBy.University. -TimeToSubway -SubwayStation,  data = dfB, subset=train)
+dir_lda$fit
+```
+
+#### Macierz pomyłek:
+```{r}
+dir_lda$predicted <- predict(dir_lda$fit, newdata=dfB[test,])
+dir_lda$cm <- table(dir_lda$predicted$class, dfB$Big[test])
+dir_lda$cm
+```
+
+#### Testowa proporcja błędów:
+```{r}
+(dir_lda$cm[1, 2] + dir_lda$cm[2, 1]) / sum(dir_lda$cm)
+```
+
+Jakość klasyfikacji na zbiorze testowym z wykorzystaniem LDA jest lepsza niż jakość klasyfikacji z wykorzystaniem regresji logistycznej.
+
+
+### LDA z wykorzystaniem najbardziej istotnych predyktorów dla regresji logistycznej:
+```{r}
+dir_lda_best <- list()
+dir_lda_best$fit <- lda(Big ~ YearBuilt + Floor + HallwayType + TimeToBusStop + N_manager + N_SchoolNearBy.Elementary.,  data = dfB, subset=train)
+dir_lda_best$fit
+```
+
+#### Macierz pomyłek:
+```{r}
+dir_lda_best$predicted <- predict(dir_lda_best$fit, newdata=dfB[test,])
+dir_lda_best$cm <- table(dir_lda_best$predicted$class, dfB$Big[test])
+dir_lda_best$cm
+```
+
+#### Testowa proporcja błędów:
+```{r}
+(dir_lda_best$cm[1, 2] + dir_lda_best$cm[2, 1]) / sum(dir_lda_best$cm)
+```
+
+Wykorzystanie najistotniejszych dla regresji logistycznej predyktorów poskutkowało niższą jakością klasyfikacji.
+
+
+### kNN dla najlepszych predyktorów z regresji logistycznej
+#### Przygotowanie danych
+```{r}
+dfB_knn = dfB[, c("YearBuilt", "Floor", "N_manager", "N_SchoolNearBy.Elementary.")]
+Mixed <- factor(ifelse(dfB$HallwayType == "mixed", 1, 0))
+Terraced =  factor(ifelse(dfB$HallwayType == "terraced", 1, 0))
+Bus = factor(ifelse(dfB$TimeToBusStop == "5min~10min", 1, 0))
+dfB_knn <- data.frame(dfB_knn, Mixed, Terraced, Bus)
+```
+#### k=1:
+```{r}
+train_set <- dfB_knn[train,]
+test_set <- dfB_knn[test,]
+Big_train <- dfB$Big[train]
+Big_test <- dfB$Big[test]
+dir_knn_1 <- knn(train_set, test_set, Big_train, k = 1)
+cm <- table(dir_knn_1, Big_test)
+cm
+```
+
+```{r}
+(cm[1, 2] + cm[2, 1]) / sum(cm)
+```
+
+#### k=3:
+```{r}
+train_set <- dfB_knn[train,]
+test_set <- dfB_knn[test,]
+Big_train <- dfB$Big[train]
+Big_test <- dfB$Big[test]
+dir_knn_1 <- knn(train_set, test_set, Big_train, k = 3)
+cm <- table(dir_knn_1, Big_test)
+cm
+```
+
+```{r}
+(cm[1, 2] + cm[2, 1]) / sum(cm)
+```
+#### k=4:
+```{r}
+train_set <- dfB_knn[train,]
+test_set <- dfB_knn[test,]
+Big_train <- dfB$Big[train]
+Big_test <- dfB$Big[test]
+dir_knn_1 <- knn(train_set, test_set, Big_train, k = 4)
+cm <- table(dir_knn_1, Big_test)
+cm
+```
+
+```{r}
+(cm[1, 2] + cm[2, 1]) / sum(cm)
+```
+
+#### k=5:
+```{r}
+train_set <- dfB_knn[train,]
+test_set <- dfB_knn[test,]
+Big_train <- dfB$Big[train]
+Big_test <- dfB$Big[test]
+dir_knn_1 <- knn(train_set, test_set, Big_train, k = 5)
+cm <- table(dir_knn_1, Big_test)
+cm
+```
+
+```{r}
+(cm[1, 2] + cm[2, 1]) / sum(cm)
+```
+
+#### k=7:
+```{r}
+train_set <- dfB_knn[train,]
+test_set <- dfB_knn[test,]
+Big_train <- dfB$Big[train]
+Big_test <- dfB$Big[test]
+dir_knn_1 <- knn(train_set, test_set, Big_train, k = 7)
+cm <- table(dir_knn_1, Big_test)
+cm
+```
+
+```{r}
+(cm[1, 2] + cm[2, 1]) / sum(cm)
+```
+
+Najlepszą jakość klasyfikacji na zbiorze testowym osiągnięto dla k=3. Proporcja błędów wyniosła w tym przypadku ok. 25.3%. Jest to najniższa wartość spośród analizowanych dotąd modeli.
+
+
+### Drzewo klasyfikacyjne
+
+#### Drzewo klasyfikacyjne dla predykcji Big w zależności od pozostałych zmiennych:
+```{r}
+big_tree <- rpart(Big ~ . -Size.sqf., data = dfB, method="class")
+summary(big_tree)
+```
+
+```{r}
+plot(big_tree, uniform=TRUE)
+text(big_tree, use.n=TRUE, all=TRUE, cex=.8)
+```
+
+
+
+
+
 
 
