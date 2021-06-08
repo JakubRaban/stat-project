@@ -74,23 +74,22 @@ Postaramy się poprawić dokładność modelu używając funkcji sklejanych do d
 hist(df$Size.sqf.)
 ```
 
-Staramy się dobrać węzły spline'a tak aby pokrywały przedziały o największej przypadającej na nie ilości mieszkań:
+Staramy się dobrać ilość stopni swobody tak aby uzyskać możliwie największy wskaźnik R^2:
 ```{r}
 library(splines)
 dir_spline <- list()
-spline_knots <- c(600, 700, 800, 900, 1000)
-dir_spline$fit <- lm(SalePrice ~ . - Size.sqf. + bs(Size.sqf., knots = spline_knots), data = train)
+dir_spline$fit <- lm(SalePrice ~ . - Size.sqf. + bs(Size.sqf., df = 10), data = train)
 summary(dir_spline$fit)
 ```
 
-Wynik funkcji `summary` wskazuje na użyteczność takiego podziału (kolumna p-wartości). Zwiększył się również wskaźnik R^2 z 0.8844 do 0.9056, co jest dobrym znakiem.\
+Wynik funkcji `summary` wskazuje na użyteczność takiego podziału (kolumna p-wartości). Zwiększył się również wskaźnik R^2 z 0.8844 do 0.9060, co jest dobrym znakiem.\
 Uruchomimy teraz przewidywanie na zbiorze testowym i sprawdzimy RMSE:
 ```{r}
 dir_spline$predicted <- predict(dir_spline$fit, test)
 rmse(test$SalePrice, dir_spline$predicted)
 ```
 
-Jak widać RMSE zbioru na zbiorze testowym zmniejszyło się z około 37100 do ok. 34100. Oznacza to że model nie jest przeuczony (nie ma overfittingu).\
+Jak widać RMSE zbioru na zbiorze testowym zmniejszyło się z około 37100 do ok. 33900. Oznacza to że model nie jest przeuczony (nie ma overfittingu).\
 Niektóre spośród dopasowań:
 
 ```{r}
