@@ -11,6 +11,7 @@ library(MASS)
 library(mltools)
 library(class)
 library(rpart)
+library(rpart.plot)
 ```
 # Projekt zaliczeniowy - analiza zbioru danych sprzedaży mieszkań w Korei
 Pobrany przez nas zbiór danych zawiera 5891 obserwacji na temat mieszkań sprzedanych w koreańskiej prowincji Daegu w latach 2007-17. 
@@ -105,6 +106,7 @@ predicted.df[predicted.df.sample, ]
 
 
 ## Klasyfikacja po rozmiarze mieszkania - duże/małe
+
 ```{r}
 file <- read.csv("dane.csv")
 df <- data.frame(file)
@@ -119,9 +121,9 @@ hist(counts, main="Flats distribution", xlab="Size sqf", ylab="Count", xlim=c(0,
 ### Podział względem rozmiaru mieszkania: małe do 908 stóp kwadratowych, duże: powyżej
 ```{r}
 sum(df$Size.sqf. <= 908)
-sum(df$Size.sqf. <= 908)/ length(df$YearBuilt)
+sum(df$Size.sqf. <= 908)/ length(df$Size.sqf.)
 sum(df$Size.sqf. > 908)
-sum(df$Size.sqf. > 908) / length(df$YearBuilt)
+sum(df$Size.sqf. > 908) / length(df$Size.sqf.)
 ```
 Małe mieszkania stanowią ok. 46% zbioru danych, duże - ok. 54%.
 
@@ -383,13 +385,62 @@ summary(big_tree)
 ```
 
 ```{r}
-plot(big_tree, uniform=TRUE)
-text(big_tree, use.n=TRUE, all=TRUE, cex=.8)
+rpart.plot(big_tree)
+```
+
+Istotniejsze predyktory znajdują się bliżej korzenia, mniej istotne - bliżej liści.
+
+#### Estymacja błędu na zbiorze testowym:
+```{r}
+big_tree <- rpart(Big ~ . -Size.sqf., data = dfB, subset=train, method="class")
+tree_class <- predict(big_tree, newdata = dfB[test,], type = "class")
+table(tree_class, dfB$Big[test])
+mean(tree_class != dfB$Big[test])
 ```
 
 
+Błąd na zbiorze testowym wyniósł ok. 10%.
 
 
+#### Drzewo klasyfikacyjne dla predykcji Big w zależności od zmiennych wybranych na początku analizy do regresji logistycznej (bez usuwania SubwayStation oraz TimeToSubway):
+```{r}
+big_tree2 <- rpart(Big ~ . -Size.sqf. -SalePrice -MonthSold -YrSold -N_FacilitiesNearBy.Total. -N_SchoolNearBy.Total. -N_APT -N_SchoolNearBy.University., data = dfB, method="class")
+summary(big_tree2)
+```
+
+```{r}
+rpart.plot(big_tree2)
+```
+
+#### Estymacja błędu na zbiorze testowym:
+```{r}
+big_tree2 <- rpart(Big ~ . -Size.sqf. -SalePrice -MonthSold -YrSold -N_FacilitiesNearBy.Total. -N_SchoolNearBy.Total. -N_APT -N_SchoolNearBy.University., data = dfB, subset=train, method="class")
+tree_class <- predict(big_tree2, newdata = dfB[test,], type = "class")
+table(tree_class, dfB$Big[test])
+mean(tree_class != dfB$Big[test])
+```
+
+Błąd na zbiorze testowym wyniósł ok. 24.4%. Jest to najniższa z osiągniętych dotąd wartości błędu.
+
+#### Drzewo klasyfikacyjne dla predykcji Big w zależności od najbardziej istotnych zmiennych z regresji logistycznej:
+```{r}
+big_tree3 <- rpart(Big ~ YearBuilt + Floor + HallwayType + TimeToBusStop + N_manager + N_SchoolNearBy.Elementary., data = dfB, method="class")
+summary(big_tree3)
+```
+
+```{r}
+rpart.plot(big_tree3)
+```
+
+#### Estymacja błędu na zbiorze testowym:
+```{r}
+big_tree3 <- rpart(Big ~ YearBuilt + Floor + HallwayType + TimeToBusStop + N_manager + N_SchoolNearBy.Elementary., data = dfB, subset=train, method="class")
+tree_class <- predict(big_tree3, newdata = dfB[test,], type = "class")
+table(tree_class, dfB$Big[test])
+mean(tree_class != dfB$Big[test])
+```
+Otrzymany wynik na zbiorze testowym jest taki sam jak wynik dla poprzedniego drzewa. Ciekawym zjawiskiem jest fakt konstrukcji identycznego drzewa jak poprzednio za wyjątkiem kryterium podziału na drugim poziomie - w poprzednim drzewie była to stacja metra, w tym - liczba szkół podstawowych w pobliżu.
 
 
-
+#### Wnioski
+Najskuteczniejszą metodą klasyfikacji mieszkań na duże oraz małe okazało się być drzewo klasyfikacyjne. Uzyskany przy jego pomocy testowy poziom błędów wyniósł ok. 24.4%. 
